@@ -122,9 +122,13 @@ NVIDIA software/runtime you use. See
 - **A3** (SceneLinear / Standard / AgX color-domain experiment):
   accepted — product default input encoding is **AgX** (scene-driven
   selection, no overexposure on strong highlights). See `A3.md`.
-- Roadmap: A4 alpha correctness, A5 diagnostics UI, A6 policy
-  validation, A7 UI / packaging; migration to the official NVIDIA
-  Streamline API when it becomes public.
+- **A4** (alpha correctness): deferred by user decision — the workflow
+  renders opaque frames only; the provisional alpha passthrough is a
+  no-op for alpha=1 content. Transparent-film/silhouette validation
+  stays an open item for when it is needed.
+- Roadmap: A5 diagnostics UI, A6 policy validation, A7 UI / packaging;
+  migration to the official NVIDIA Streamline API when it becomes
+  public.
 
 ## References
 
