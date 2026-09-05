@@ -1,0 +1,27 @@
+# Build outputs
+bin/
+*.obj
+*.exp
+*.lib
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Probe run artifacts
+a1_*.png
+a1_*.bin
+a1_*.report.json
+a1_out*
+a2_*
+cs_*.png
+*.rgba_f32.bin
+
+# NVIDIA proprietary runtime binaries — NEVER redistributed (project policy)
+# Defense-in-depth: build outputs are already ignored; these patterns also
+# guard against accidentally committing user-provided runtime files.
+nvngx_dlssnr.dll
+nvngx.dll
+_nvngx.dll
+nvof*.dll
+*.addon64
