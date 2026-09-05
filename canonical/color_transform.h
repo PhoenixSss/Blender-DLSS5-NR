@@ -6,7 +6,8 @@
 // for the neural backend:
 //   A. SceneLinear      — identity (raw scene-linear HDR)
 //   B. StandardDisplay  — sRGB EOTF (Blender "Standard" view family)
-//   C. AgXDisplay       — AgX display transform (Blender "AgX" view family)
+//   C. AgXDisplay       — AgX tone map + sRGB encode (true display/sRGB
+//                         representation of Blender's "AgX" view)
 //
 // Both the probe and the Blender bridge call these shared functions, so
 // cross-validation between the two stays bit-exact.

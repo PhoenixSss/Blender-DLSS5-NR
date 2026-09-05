@@ -137,9 +137,19 @@ bool ConvertEncoding(const CanonicalColor& in, ColorEncoding target,
     if (target == ColorEncoding::AgXDisplay) {
         const size_t n = static_cast<size_t>(in.width) * in.height;
         for (size_t i = 0; i < n; ++i) {
-            AgxTransform(&out->rgba_f32[i * 4 + 0],
-                         &out->rgba_f32[i * 4 + 1],
-                         &out->rgba_f32[i * 4 + 2]);
+            float r = in.rgba_f32[i * 4 + 0];
+            float g = in.rgba_f32[i * 4 + 1];
+            float b = in.rgba_f32[i * 4 + 2];
+            AgxTransform(&r, &g, &b);
+            // AgxTransform outputs LINEAR tone-mapped values (three.js:
+            // "outputs are encoded as Linear-sRGB"). The display encoding
+            // (§13: "AgX view -> display/sRGB representation") must
+            // include the sRGB encode, otherwise downstream consumers
+            // mislabel linear data as sRGB and double-map it (user-found
+            // bug 2026-09-05: dark output in Blender's AgX pipeline).
+            out->rgba_f32[i * 4 + 0] = SrgbEotf(r);
+            out->rgba_f32[i * 4 + 1] = SrgbEotf(g);
+            out->rgba_f32[i * 4 + 2] = SrgbEotf(b);
         }
         return true;
     }

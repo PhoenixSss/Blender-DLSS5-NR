@@ -240,6 +240,16 @@ void TestColorTransforms() {
         CHECK(ConvertEncoding(in, canonical::ColorEncoding::AgXDisplay, &out));
         CHECK(out.encoding == canonical::ColorEncoding::AgXDisplay);
         CHECK(out.rgba_f32[1] <= 1.0f && out.rgba_f32[1] >= 0.0f);
+        // AgXDisplay must be the true display/sRGB representation:
+        // sRGB-encode of the AgX tone-mapped linear value (linear-only
+        // output caused the sRGB mislabel/double-mapping bug).
+        {
+            float ar = in.rgba_f32[4], ag = in.rgba_f32[5], ab = in.rgba_f32[6];
+            AgxTransform(&ar, &ag, &ab);
+            CHECK(out.rgba_f32[4] == SrgbEotf(ar));
+            CHECK(out.rgba_f32[5] == SrgbEotf(ag));
+            CHECK(out.rgba_f32[6] == SrgbEotf(ab));
+        }
         CHECK(!ConvertEncoding(in, canonical::ColorEncoding::ExperimentalProxy, &out));
     }
 }
