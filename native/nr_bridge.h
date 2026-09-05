@@ -24,11 +24,17 @@ typedef struct NR_Context NR_Context;
 
 // Canonical frame: top-left origin, row-major, RGBA float32 (requirements
 // §13/§24 — the Blender layer converts its own conventions to this form).
+// The pixel VALUES are always scene-linear; `encoding` selects the color
+// domain the backend receives (§13 A/B/C paths):
+//   0 = SceneLinear (raw HDR passthrough)
+//   1 = StandardDisplay (sRGB EOTF)
+//   2 = AgXDisplay (AgX display transform)
 typedef struct NR_FrameDesc {
     uint32_t width;
     uint32_t height;
     const float* rgba_f32;  // 4 * width * height floats
     int reset;              // still-image mode: 1
+    int encoding;           // ColorEncoding value (0/1/2)
 } NR_FrameDesc;
 
 // Defaults reproduce the verified still-image working set.
@@ -47,6 +53,8 @@ typedef struct NR_Options {
     const char* ngx_core_path;  // explicit core override; NULL = auto-discovery
     int gpu_index;              // NVIDIA adapter index
     int reject_unsigned;        // 1 = reject invalid Authenticode
+    int clamp_input;            // 1 = clamp RGB to [0,1] (A1/A2 behavior);
+                                // 0 = scene-linear HDR passthrough (default)
 } NR_Options;
 
 // Error taxonomy values (§25; matches the backend interface enum order,

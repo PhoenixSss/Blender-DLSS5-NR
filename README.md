@@ -119,10 +119,12 @@ NVIDIA software/runtime you use. See
 - **A1** (standalone Feature 18 probe): done and verified on RTX 5090.
 - **A2** (Blender bridge integration): done and verified (headless +
   GUI). See `A2.md`.
-- Roadmap: A3 color-domain comparison (SceneLinear/Standard/AgX), A4
-  alpha correctness, A5 diagnostics UI, A6 policy validation, A7 UI /
-  packaging; migration to the official NVIDIA Streamline API when it
-  becomes public.
+- **A3** (SceneLinear / Standard / AgX color-domain experiment):
+  implemented and automatically verified; default encoding pending
+  visual acceptance. See `A3.md`.
+- Roadmap: A4 alpha correctness, A5 diagnostics UI, A6 policy
+  validation, A7 UI / packaging; migration to the official NVIDIA
+  Streamline API when it becomes public.
 
 ## References
 

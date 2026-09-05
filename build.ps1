@@ -176,6 +176,7 @@ $ProbeSources = @(
     (Join-Path $ProjectRoot "diagnostics\json_writer.cpp"),
     (Join-Path $ProjectRoot "diagnostics\gpu_info.cpp"),
     (Join-Path $ProjectRoot "diagnostics\file_identity.cpp"),
+    (Join-Path $ProjectRoot "canonical\color_transform.cpp"),
     (Join-Path $ProjectRoot "backends\interface\backend_registry.cpp"),
     (Join-Path $ProjectRoot "backends\feature18\feature18_backend.cpp"),
     (Join-Path $ProjectRoot "probe\test_pattern.cpp"),
@@ -195,6 +196,7 @@ if (-not $SkipTests) {
     $TestSources = @(
         (Join-Path $ProjectRoot "diagnostics\json_writer.cpp"),
         (Join-Path $ProjectRoot "diagnostics\gpu_info.cpp"),
+        (Join-Path $ProjectRoot "canonical\color_transform.cpp"),
         (Join-Path $ProjectRoot "probe\test_pattern.cpp"),
         (Join-Path $ProjectRoot "tests\unit_tests.cpp")
     )
@@ -207,6 +209,7 @@ if (-not $SkipTests) {
 
 $BridgeSources = @(
     (Join-Path $ProjectRoot "native\nr_bridge.cpp"),
+    (Join-Path $ProjectRoot "canonical\color_transform.cpp"),
     (Join-Path $ProjectRoot "backends\interface\backend_registry.cpp"),
     (Join-Path $ProjectRoot "backends\feature18\feature18_backend.cpp"),
     (Join-Path $ProjectRoot "diagnostics\gpu_info.cpp"),

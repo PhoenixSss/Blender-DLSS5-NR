@@ -5,9 +5,12 @@
 import bpy
 
 
-def write_result_image(name, width, height, rgba_top_left):
+def write_result_image(name, width, height, rgba_top_left, colorspace="sRGB"):
     """Creates (or replaces) a float Image datablock named `name` with the
     given top-left RGBA float32 data. Returns the Image.
+
+    `colorspace` labels the buffer semantics (A3): display-referred
+    encodings use "sRGB", scene-linear HDR output uses "Linear".
 
     No temporary files are involved (§29); the data goes straight into the
     datablock buffer."""
@@ -23,10 +26,10 @@ def write_result_image(name, width, height, rgba_top_left):
 
     image = bpy.data.images.new(name, width=width, height=height,
                                 float_buffer=True)
-    # Match the typical input labeling (sRGB-tagged PNGs); the buffer holds
-    # the numeric values as-is, no color transform is applied here (A3).
+    # The buffer holds the numeric values as-is; the label only declares
+    # their semantics (no color transform is applied here).
     try:
-        image.colorspace_settings.name = "sRGB"
+        image.colorspace_settings.name = colorspace
     except TypeError:
         pass  # colorspace unavailable in this Blender version
 

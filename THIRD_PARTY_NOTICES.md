@@ -35,6 +35,25 @@ The following public-domain single-header libraries are vendored under
   - Copyright (c) 2017 Sean Barrett
   - Public domain / MIT — https://github.com/nothings/stb
 
+## tinyexr
+
+- `tinyexr.h` (v1.0.9) — EXR reader used by the probe.
+  - Copyright (c) 2014-2021 Syoyo Fujita
+  - BSD 3-Clause — https://github.com/syoyo/tinyexr
+
+## AgX color transform (three.js / Google Filament)
+
+The canonical AgX display-transform implementation in
+`canonical/color_transform.cpp` ports the published AgX tone-mapping
+constants (inset/outset matrices, log2 range and contrast polynomial):
+
+- three.js — MIT License, Copyright (c) 2010-2026 three.js authors.
+  https://github.com/mrdoob/three.js
+- Google Filament (AgX tone mapping, PR #7236) — Apache License 2.0.
+  https://github.com/google/filament
+- AgX was originally designed by Troy Sobotka; Blender 5.x ships an
+  AgX-family view transform. See also https://github.com/EaryChow/AgX.
+
 ## ComfyUI-DLSS5-NR
 
 The D3D12/NGX bridge architecture, the NGX parameter-object ABI layout,

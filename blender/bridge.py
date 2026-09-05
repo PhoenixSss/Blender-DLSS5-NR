@@ -42,6 +42,7 @@ class NR_Options(ctypes.Structure):
         ("ngx_core_path", ctypes.c_char_p),   # UTF-8, may be None
         ("gpu_index", ctypes.c_int),
         ("reject_unsigned", ctypes.c_int),
+        ("clamp_input", ctypes.c_int),        # 1 = [0,1] clamp (A1/A2), 0 = HDR passthrough
     ]
 
 
@@ -51,6 +52,7 @@ class NR_FrameDesc(ctypes.Structure):
         ("height", ctypes.c_uint32),
         ("rgba_f32", ctypes.POINTER(ctypes.c_float)),
         ("reset", ctypes.c_int),
+        ("encoding", ctypes.c_int),  # 0=SceneLinear 1=StandardDisplay 2=AgXDisplay
     ]
 
 
@@ -176,12 +178,13 @@ class Bridge:
     """One bridge DLL session: create -> initialize -> evaluate* -> destroy."""
 
     def __init__(self, runtime_dir=None, ngx_core_path=None, gpu_index=0,
-                 reject_unsigned=False):
+                 reject_unsigned=False, clamp_input=False):
         opts = NR_Options()
         opts.runtime_dir = runtime_dir.encode("utf-8") if runtime_dir else None
         opts.ngx_core_path = ngx_core_path.encode("utf-8") if ngx_core_path else None
         opts.gpu_index = gpu_index
         opts.reject_unsigned = 1 if reject_unsigned else 0
+        opts.clamp_input = 1 if clamp_input else 0
         err = NR_Error()
         handle = ctypes.c_void_p()
         if not _lib.nr_create(ctypes.byref(handle), ctypes.byref(opts),
@@ -198,9 +201,22 @@ class Bridge:
         if not _lib.nr_initialize(self._handle, ctypes.byref(err)):
             raise NRBridgeError(err)
 
-    def evaluate(self, width, height, rgba_top_left, settings=None):
-        """rgba_top_left: numpy float32 array (4*w*h) or any object
-        supporting ctypes.data_as. Returns a new numpy float32 array."""
+    # §13 A/B/C encoding values (must match canonical ColorEncoding order)
+    ENCODING_SCENE_LINEAR = 0
+    ENCODING_STANDARD = 1
+    ENCODING_AGX = 2
+
+    ENCODING_BY_NAME = {
+        "scene-linear": 0,
+        "standard": 1,
+        "agx": 2,
+    }
+
+    def evaluate(self, width, height, rgba_top_left, settings=None, encoding=0):
+        """rgba_top_left: numpy float32 array (4*w*h) of scene-linear
+        values; `encoding` selects the color domain fed to the backend
+        (0=scene-linear passthrough, 1=Standard/sRGB, 2=AgX).
+        Returns a new numpy float32 array in the same domain."""
         import numpy as np
         if rgba_top_left.size != width * height * 4:
             raise ValueError("rgba_top_left size does not match width/height")
@@ -223,7 +239,8 @@ class Bridge:
         frame.width = width
         frame.height = height
         frame.rgba_f32 = rgba_top_left.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-        frame.reset = 1  # still-image mode (A2)
+        frame.reset = 1  # still-image mode
+        frame.encoding = encoding
 
         out = np.empty(width * height * 4, dtype=np.float32)
         err = NR_Error()

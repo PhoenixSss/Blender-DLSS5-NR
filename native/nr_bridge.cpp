@@ -15,6 +15,7 @@
 
 #include "backends/interface/backend_registry.h"
 #include "backends/interface/neural_backend.h"
+#include "canonical/color_transform.h"
 
 namespace {
 
@@ -23,6 +24,8 @@ using blender_dlss5::backends::BackendErrorCategory;
 using blender_dlss5::backends::INeuralRenderingBackend;
 using blender_dlss5::backends::NeuralSettings;
 using blender_dlss5::canonical::CanonicalColor;
+using blender_dlss5::canonical::ColorEncoding;
+using blender_dlss5::canonical::ConvertEncoding;
 
 void CopyStr(char* dst, size_t cap, const std::string& src) {
     if (!dst || cap == 0) return;
@@ -58,7 +61,7 @@ struct NR_Context {
 extern "C" {
 
 const char* __cdecl nr_version(void) {
-    return "0.1.0-a2";
+    return "0.2.0-a3";
 }
 
 int __cdecl nr_create(NR_Context** out, const NR_Options* opts, NR_Error* err) {
@@ -98,6 +101,7 @@ int __cdecl nr_create(NR_Context** out, const NR_Options* opts, NR_Error* err) {
         const std::string gpu = std::to_string(opts->gpu_index);
         set("gpu_index", gpu.c_str());
         set("reject_unsigned", opts->reject_unsigned ? "1" : "0");
+        set("clamp_input", opts->clamp_input ? "1" : "0");
     }
 
     *out = ctx.release();
@@ -144,6 +148,21 @@ int __cdecl nr_evaluate(NR_Context* ctx, const NR_FrameDesc* frame,
     in.rgba_f32.assign(frame->rgba_f32,
                        frame->rgba_f32 +
                            static_cast<size_t>(frame->width) * frame->height * 4);
+
+    // §13 A/B/C: the frame always carries scene-linear values; convert to
+    // the requested color domain before evaluation. The backend's resource
+    // format is a separate concern from these color semantics.
+    CanonicalColor encoded;
+    const int enc = frame->encoding;
+    if (enc < 0 || enc > 2 ||
+        !ConvertEncoding(in, static_cast<ColorEncoding>(enc), &encoded)) {
+        BackendError e0;
+        e0.category = BackendErrorCategory::Internal;
+        e0.stage = "evaluate";
+        e0.message = "Unsupported encoding value in frame descriptor";
+        FillError(err, e0);
+        return 0;
+    }
     CanonicalColor out;
 
     NeuralSettings s;
@@ -157,11 +176,11 @@ int __cdecl nr_evaluate(NR_Context* ctx, const NR_FrameDesc* frame,
 
     std::lock_guard<std::mutex> lock(ctx->mutex);
     BackendError be;
-    if (!ctx->backend->process(in, out, s, &be)) {
+    if (!ctx->backend->process(encoded, out, s, &be)) {
         FillError(err, be);
         return 0;
     }
-    if (out.rgba_f32.size() != in.rgba_f32.size()) {
+    if (out.rgba_f32.size() != encoded.rgba_f32.size()) {
         BackendError e2;
         e2.category = BackendErrorCategory::InvalidOutput;
         e2.stage = "evaluate";

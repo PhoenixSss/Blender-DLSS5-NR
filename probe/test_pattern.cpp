@@ -70,4 +70,32 @@ canonical::CanonicalColor BuildTestPattern(uint32_t width, uint32_t height) {
     return c;
 }
 
+canonical::CanonicalColor BuildTestPatternHdr(uint32_t width, uint32_t height) {
+    canonical::CanonicalColor c = BuildTestPattern(width, height);
+
+    // Replace the highlight block with 10x values and add a 100x spot.
+    const float w = static_cast<float>(width);
+    const float h = static_cast<float>(height);
+    for (uint32_t y = 0; y < height; ++y) {
+        for (uint32_t x = 0; x < width; ++x) {
+            const float nx = static_cast<float>(x) / w;
+            const float ny = static_cast<float>(y) / h;
+            const size_t p = (static_cast<size_t>(y) * width + x) * 4;
+            // 10x highlight block (replaces the near-white block region)
+            if (nx > 0.82f && nx < 0.92f && ny > 0.78f && ny < 0.90f) {
+                c.rgba_f32[p + 0] = 9.5f;
+                c.rgba_f32[p + 1] = 9.5f;
+                c.rgba_f32[p + 2] = 9.4f;
+            }
+            // 100x bright spot (specular-like)
+            if (nx > 0.95f && nx < 0.98f && ny > 0.02f && ny < 0.05f) {
+                c.rgba_f32[p + 0] = 95.0f;
+                c.rgba_f32[p + 1] = 95.0f;
+                c.rgba_f32[p + 2] = 94.0f;
+            }
+        }
+    }
+    return c;
+}
+
 }  // namespace blender_dlss5::probe

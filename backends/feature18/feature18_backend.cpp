@@ -110,6 +110,9 @@ struct Feature18Backend::Impl {
     std::wstring runtime_dir;
     std::wstring ngx_core_path;
     bool reject_unsigned = false;
+    // A3: clamp upload/readback RGB to [0,1]. Default OFF — scene-linear
+    // HDR values (>1) pass through; --clamp restores the A1/A2 behavior.
+    bool clamp_input = false;
 
     // Identity / diagnostics.
     GpuInfo gpu;
@@ -737,6 +740,10 @@ bool Feature18Backend::set_option(const char* key, const char* value) {
         impl_->reject_unsigned = (v == "1" || v == "true");
         return true;
     }
+    if (k == "clamp_input") {
+        impl_->clamp_input = (v == "1" || v == "true");
+        return true;
+    }
     return false;
 }
 
@@ -854,9 +861,9 @@ bool Feature18Backend::process(const canonical::CanonicalColor& in,
     if (!impl_->EnsureFeature(w, h, settings, err)) return false;
     impl_->SetParams(style, preset, intensity, tone, structure, skin, automask);
 
-    // Upload: f32 -> RGBA16F. A1 clamps to [0,1] and forces alpha=1 (the
-    // verified still-image reference behavior); HDR/alpha semantics are
-    // revisited in A3/A4.
+    // Upload: f32 -> RGBA16F. Alpha is forced to 1 (A4 owns alpha
+    // semantics). RGB clamping is controlled by the clamp_input option
+    // (A3: off by default so scene-linear HDR values pass through).
     void* mapped = nullptr;
     HRESULT hr = impl_->upload->Map(0, nullptr, &mapped);
     if (FAILED(hr) || !mapped) {
@@ -872,9 +879,16 @@ bool Feature18Backend::process(const canonical::CanonicalColor& in,
         auto* row = reinterpret_cast<uint16_t*>(dst_base + static_cast<size_t>(y) * impl_->row_pitch);
         for (UINT x = 0; x < w; ++x) {
             const size_t i = (static_cast<size_t>(y) * w + x) * 4;
-            row[x * 4 + 0] = FloatToHalf(std::clamp(src[i + 0], 0.0f, 1.0f));
-            row[x * 4 + 1] = FloatToHalf(std::clamp(src[i + 1], 0.0f, 1.0f));
-            row[x * 4 + 2] = FloatToHalf(std::clamp(src[i + 2], 0.0f, 1.0f));
+            const float r = src[i + 0], g = src[i + 1], b = src[i + 2];
+            if (impl_->clamp_input) {
+                row[x * 4 + 0] = FloatToHalf(std::clamp(r, 0.0f, 1.0f));
+                row[x * 4 + 1] = FloatToHalf(std::clamp(g, 0.0f, 1.0f));
+                row[x * 4 + 2] = FloatToHalf(std::clamp(b, 0.0f, 1.0f));
+            } else {
+                row[x * 4 + 0] = FloatToHalf(r);
+                row[x * 4 + 1] = FloatToHalf(g);
+                row[x * 4 + 2] = FloatToHalf(b);
+            }
             row[x * 4 + 3] = FloatToHalf(1.0f);
         }
     }
@@ -973,14 +987,17 @@ bool Feature18Backend::process(const canonical::CanonicalColor& in,
     out.premultiplied_alpha = in.premultiplied_alpha;
     for (size_t i = 0; i < n; ++i) {
         const size_t p = i * 4;
-        if (swap_rb) {
-            out.rgba_f32[p + 0] = std::clamp(raw[p + 2], 0.0f, 1.0f);
-            out.rgba_f32[p + 1] = std::clamp(raw[p + 1], 0.0f, 1.0f);
-            out.rgba_f32[p + 2] = std::clamp(raw[p + 0], 0.0f, 1.0f);
+        const float v0 = swap_rb ? raw[p + 2] : raw[p + 0];
+        const float v1 = raw[p + 1];
+        const float v2 = swap_rb ? raw[p + 0] : raw[p + 2];
+        if (impl_->clamp_input) {
+            out.rgba_f32[p + 0] = std::clamp(v0, 0.0f, 1.0f);
+            out.rgba_f32[p + 1] = std::clamp(v1, 0.0f, 1.0f);
+            out.rgba_f32[p + 2] = std::clamp(v2, 0.0f, 1.0f);
         } else {
-            out.rgba_f32[p + 0] = std::clamp(raw[p + 0], 0.0f, 1.0f);
-            out.rgba_f32[p + 1] = std::clamp(raw[p + 1], 0.0f, 1.0f);
-            out.rgba_f32[p + 2] = std::clamp(raw[p + 2], 0.0f, 1.0f);
+            out.rgba_f32[p + 0] = v0;
+            out.rgba_f32[p + 1] = v1;
+            out.rgba_f32[p + 2] = v2;
         }
         // §14 (provisional): the network output alpha is not meaningful in
         // A1; preserve the input alpha. Full alpha semantics are A4.

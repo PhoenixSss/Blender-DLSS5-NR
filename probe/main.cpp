@@ -19,6 +19,7 @@
 #include "backends/interface/backend_registry.h"
 #include "backends/interface/neural_backend.h"
 #include "canonical/color.h"
+#include "canonical/color_transform.h"
 #include "png_io.h"
 #include "report.h"
 #include "test_pattern.h"
@@ -32,7 +33,7 @@ constexpr const char* kProbeVersion = "0.1.0-a1";
 struct Options {
     std::string runtime_dir;
     std::string ngx_core_path;
-    std::string input_png;
+    std::string input_png;  // PNG or EXR (by extension)
     uint32_t width = 1920;
     uint32_t height = 1080;
     std::string output_prefix;
@@ -41,6 +42,8 @@ struct Options {
     std::string backend_name;  // empty = default registered backend
     backends::NeuralSettings settings;
     canonical::ColorEncoding encoding = canonical::ColorEncoding::SceneLinear;
+    bool hdr_pattern = false;  // A3: synthetic pattern with >1 highlights
+    bool clamp = false;        // A3: restore the A1/A2 [0,1] clamp behavior
     bool reject_unsigned = false;
     bool show_help = false;
     bool show_version = false;
@@ -110,11 +113,20 @@ bool ParseArgs(int argc, char** argv, Options* o, std::string* usage_error) {
         else if (a == "--encoding") {
             const char* v = need(&i, a.c_str());
             if (!v) return false;
+            // Canonical names first, then the short CLI aliases.
             if (!canonical::from_string(v, &o->encoding)) {
-                if (usage_error) *usage_error = std::string("Unknown encoding: ") + v;
-                return false;
+                const std::string s(v);
+                if (s == "scene-linear") o->encoding = canonical::ColorEncoding::SceneLinear;
+                else if (s == "standard") o->encoding = canonical::ColorEncoding::StandardDisplay;
+                else if (s == "agx") o->encoding = canonical::ColorEncoding::AgXDisplay;
+                else {
+                    if (usage_error) *usage_error = std::string("Unknown encoding: ") + v;
+                    return false;
+                }
             }
         }
+        else if (a == "--hdr-pattern") { o->hdr_pattern = true; }
+        else if (a == "--clamp") { o->clamp = true; }
         else if (a == "--reject-unsigned") { o->reject_unsigned = true; }
         else {
             if (usage_error) *usage_error = "Unknown option: " + a;
@@ -218,6 +230,7 @@ int main(int argc, char** argv) {
     backend->set_option("runtime_dir", o.runtime_dir.c_str());
     if (!o.ngx_core_path.empty()) backend->set_option("ngx_core_path", o.ngx_core_path.c_str());
     backend->set_option("reject_unsigned", o.reject_unsigned ? "1" : "0");
+    backend->set_option("clamp_input", o.clamp ? "1" : "0");
 
     // ---- initialize (GPU policy -> runtime identity -> D3D12 -> NGX) -----
     std::printf("[stage] initializing backend (gpu_check -> runtime_identity -> "
@@ -295,8 +308,12 @@ int main(int argc, char** argv) {
     // ---- input frame ------------------------------------------------------
     canonical::CanonicalColor input;
     if (!o.input_png.empty()) {
+        const bool is_exr = o.input_png.size() > 4 &&
+                            o.input_png.compare(o.input_png.size() - 4, 4, ".exr") == 0;
         std::string perr;
-        if (!probe::LoadPng(o.input_png, &input, &perr)) {
+        const bool loaded = is_exr ? probe::LoadExr(o.input_png, &input, &perr)
+                                   : probe::LoadPng(o.input_png, &input, &perr);
+        if (!loaded) {
             std::fprintf(stderr, "[error] %s\n", perr.c_str());
             report.has_error = true;
             report.error.category = backends::BackendErrorCategory::Internal;
@@ -307,15 +324,39 @@ int main(int argc, char** argv) {
             probe::WriteReportJson(o.report_path, report, &werr);
             return ExitCodeFor(report.error);
         }
-        std::printf("[input] %s (%ux%u)\n", o.input_png.c_str(), input.width, input.height);
+        std::printf("[input] %s (%ux%u, %s)\n", o.input_png.c_str(), input.width,
+                    input.height, is_exr ? "EXR" : "PNG");
     } else {
-        input = probe::BuildTestPattern(o.width, o.height);
-        std::printf("[input] synthetic test pattern (%ux%u)\n", input.width, input.height);
+        input = o.hdr_pattern ? probe::BuildTestPatternHdr(o.width, o.height)
+                              : probe::BuildTestPattern(o.width, o.height);
+        std::printf("[input] synthetic %s pattern (%ux%u)\n",
+                    o.hdr_pattern ? "HDR" : "test", input.width, input.height);
     }
     input.encoding = o.encoding;
     report.width = input.width;
     report.height = input.height;
     report.encoding = canonical::to_string(o.encoding);
+
+    // §13 A/B/C: convert the scene-linear input to the requested color
+    // domain (A3 — this used to be metadata-only).
+    {
+        canonical::CanonicalColor converted;
+        if (!canonical::ConvertEncoding(input, o.encoding, &converted)) {
+            std::fprintf(stderr, "[error] Unsupported encoding conversion: %s\n",
+                         canonical::to_string(o.encoding));
+            report.has_error = true;
+            report.error.category = backends::BackendErrorCategory::Internal;
+            report.error.stage = "input";
+            report.error.message = "Unsupported encoding conversion";
+            report.success = false;
+            std::string werr;
+            probe::WriteReportJson(o.report_path, report, &werr);
+            return ExitCodeFor(report.error);
+        }
+        input = std::move(converted);
+        std::printf("[input] encoded as %s (clamp=%s)\n", canonical::to_string(o.encoding),
+                    o.clamp ? "on" : "off");
+    }
     report.style = o.settings.style;
     report.preset = o.settings.preset;
     report.intensity = o.settings.intensity;

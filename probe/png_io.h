@@ -16,6 +16,12 @@ namespace blender_dlss5::probe {
 bool LoadPng(const std::string& path, canonical::CanonicalColor* out,
              std::string* error);
 
+// Loads an EXR (half/float) into a float RGBA frame. EXR rows are
+// top-down, matching the canonical top-left convention directly; values
+// are scene-linear floats (encoding metadata set to SceneLinear).
+bool LoadExr(const std::string& path, canonical::CanonicalColor* out,
+             std::string* error);
+
 // Writes a float RGBA frame as 8-bit PNG (values clamped to [0,1]).
 bool SavePng(const std::string& path, const canonical::CanonicalColor& frame,
              std::string* error);

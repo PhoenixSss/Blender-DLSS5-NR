@@ -11,6 +11,13 @@
 #include "third_party/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "third_party/stb_image_write.h"
+// tinyexr reuses stb's zlib decoder (stbi_zlib_decode_buffer) — no
+// separate miniz/zlib dependency needed. MINIZ must be explicitly
+// disabled: its include branch wins over STB_ZLIB by default.
+#define TINYEXR_USE_MINIZ (0)
+#define TINYEXR_USE_STB_ZLIB (1)
+#define TINYEXR_IMPLEMENTATION
+#include "third_party/tinyexr.h"
 
 namespace blender_dlss5::probe {
 
@@ -105,6 +112,33 @@ bool LoadPng(const std::string& path, canonical::CanonicalColor* out,
         out->rgba_f32[i] = static_cast<float>(pixels[i]) / 255.0f;
     }
     stbi_image_free(pixels);
+    return true;
+}
+
+bool LoadExr(const std::string& path, canonical::CanonicalColor* out,
+             std::string* error) {
+    if (!out) return false;
+    float* pixels = nullptr;
+    int w = 0, h = 0;
+    const char* exr_err = nullptr;
+    const int ret = LoadEXR(&pixels, &w, &h, path.c_str(), &exr_err);
+    if (ret != TINYEXR_SUCCESS) {
+        if (error) *error = exr_err ? std::string("tinyexr: ") + exr_err
+                                    : "tinyexr: unknown EXR error";
+        FreeEXRErrorMessage(exr_err);
+        return false;
+    }
+    if (w <= 0 || h <= 0 || !pixels) {
+        if (pixels) free(pixels);
+        if (error) *error = "EXR has invalid dimensions";
+        return false;
+    }
+    out->width = static_cast<uint32_t>(w);
+    out->height = static_cast<uint32_t>(h);
+    out->encoding = canonical::ColorEncoding::SceneLinear;
+    const size_t n = static_cast<size_t>(w) * h * 4;
+    out->rgba_f32.assign(pixels, pixels + n);
+    free(pixels);
     return true;
 }
 

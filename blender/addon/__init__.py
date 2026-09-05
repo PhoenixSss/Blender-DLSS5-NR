@@ -51,7 +51,7 @@ def _runtime_dir():
     return os.environ.get("DLSS5NR_RUNTIME_DIR", DEFAULT_RUNTIME_DIR)
 
 
-def _run_processing(input_image, name_hint):
+def _run_processing(input_image, encoding=0, clamp=False):
     runtime_dir = _runtime_dir()
     if not runtime_dir:
         raise RuntimeError(
@@ -62,7 +62,7 @@ def _run_processing(input_image, name_hint):
     w, h = input_image.size
     rgba = render_result.image_pixels_top_left(input_image)
 
-    with bridge.Bridge(runtime_dir=runtime_dir) as b:
+    with bridge.Bridge(runtime_dir=runtime_dir, clamp_input=clamp) as b:
         b.initialize()
         diag = b.diagnostics()
         print(f"[DLSS5-NR] gpu={diag['gpu_name']} driver={diag['driver_version']} "
@@ -70,13 +70,18 @@ def _run_processing(input_image, name_hint):
         print(f"[DLSS5-NR] runtime={diag['runtime_path']}")
         print(f"[DLSS5-NR] runtime sha256={diag['runtime_sha256']} "
               f"class={diag['runtime_classification']}")
-        out = b.evaluate(w, h, rgba)
+        out = b.evaluate(w, h, rgba, encoding=encoding)
         # Re-read after evaluate: create/evaluate results are filled by then.
         diag2 = b.diagnostics()
-        print(f"[DLSS5-NR] CreateFeature={diag2['create_feature_result']} "
+        print(f"[DLSS5-NR] encoding={encoding} clamp={clamp} "
+              f"CreateFeature={diag2['create_feature_result']} "
               f"EvaluateFeature={diag2['last_evaluate_result']}")
 
-    return image_output.write_result_image("DLSS5_NR_Result", w, h, out)
+    # Scene-linear HDR output is labeled "Linear"; display-referred
+    # encodings are sRGB-encoded values.
+    colorspace = "Linear" if encoding == 0 else "sRGB"
+    return image_output.write_result_image("DLSS5_NR_Result", w, h, out,
+                                           colorspace=colorspace)
 
 
 class DLSS5NR_OT_ProcessImage(bpy.types.Operator):
@@ -87,6 +92,22 @@ class DLSS5NR_OT_ProcessImage(bpy.types.Operator):
     bl_description = "Run the active image through DLSS 5 Neural Rendering " \
                      "(A2: image datablock input)"
 
+    encoding: bpy.props.EnumProperty(
+        name="Color Encoding",
+        description="Color domain fed to the neural backend (A3 experiment)",
+        items=[
+            ("0", "Scene Linear", "Raw scene-linear HDR passthrough"),
+            ("1", "Standard", "sRGB EOTF display encoding"),
+            ("2", "AgX", "AgX display transform"),
+        ],
+        default="0",
+    )
+    clamp: bpy.props.BoolProperty(
+        name="Clamp [0,1]",
+        description="Clamp RGB to [0,1] (A1/A2 behavior; off = HDR passthrough)",
+        default=False,
+    )
+
     @classmethod
     def poll(cls, context):
         space = getattr(context, "space_data", None)
@@ -95,7 +116,8 @@ class DLSS5NR_OT_ProcessImage(bpy.types.Operator):
     def execute(self, context):
         try:
             result = _run_processing(context.space_data.image,
-                                     "DLSS5_NR_Result")
+                                     encoding=int(self.encoding),
+                                     clamp=self.clamp)
         except Exception as e:  # noqa: BLE001 — surface everything to user
             self.report({"ERROR"}, str(e))
             print(f"[DLSS5-NR] ERROR: {e}")
@@ -120,13 +142,31 @@ class DLSS5NR_OT_ProcessRenderResult(bpy.types.Operator):
                 raise RuntimeError(
                     "No compositing node group on this scene "
                     "(Blender 5.x: Scene.compositing_node_group)")
-            result = _run_processing(viewer, "DLSS5_NR_Result")
+            result = _run_processing(viewer,
+                                     encoding=int(self.encoding),
+                                     clamp=self.clamp)
         except Exception as e:  # noqa: BLE001
             self.report({"ERROR"}, str(e))
             print(f"[DLSS5-NR] ERROR: {e}")
             return {"CANCELLED"}
         self.report({"INFO"}, f"DLSS 5 NR result written to {result.name!r}")
         return {"FINISHED"}
+
+    # Same A3 experiment properties as the image operator (no F3 operator
+    # properties dialog here — console-driven in A3, UI in A7).
+    encoding: bpy.props.EnumProperty(
+        name="Color Encoding",
+        items=[
+            ("0", "Scene Linear", "Raw scene-linear HDR passthrough"),
+            ("1", "Standard", "sRGB EOTF display encoding"),
+            ("2", "AgX", "AgX display transform"),
+        ],
+        default="0",
+    )
+    clamp: bpy.props.BoolProperty(
+        name="Clamp [0,1]",
+        default=False,
+    )
 
 
 CLASSES = (

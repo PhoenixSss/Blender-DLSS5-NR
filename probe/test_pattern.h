@@ -13,4 +13,9 @@ namespace blender_dlss5::probe {
 // which keeps the determinism acceptance test meaningful.
 canonical::CanonicalColor BuildTestPattern(uint32_t width, uint32_t height);
 
+// HDR variant (A3): same base pattern plus scene-linear highlight blocks
+// at 10x and 100x brightness (>1 values) to exercise the unclamped
+// scene-linear path and the Standard/AgX display-encoding paths.
+canonical::CanonicalColor BuildTestPatternHdr(uint32_t width, uint32_t height);
+
 }  // namespace blender_dlss5::probe

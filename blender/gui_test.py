@@ -15,8 +15,9 @@ TEST_IMAGE_DIR = os.environ.get(
     r"D:\workspace\program\DLSS5-Blender\Blender-DLSS5-NR")
 
 
-def run_nr(imgname):
-    """Loads the image, shows it in an Image Editor and runs the operator."""
+def run_nr(imgname, encoding=0, clamp=False):
+    """Loads the image, shows it in an Image Editor and runs the operator.
+    encoding: 0=scene-linear, 1=standard, 2=agx (A3 experiment)."""
     img = bpy.data.images.get(imgname)
     if img is None:
         img = bpy.data.images.load(os.path.join(TEST_IMAGE_DIR, imgname))
@@ -30,11 +31,13 @@ def run_nr(imgname):
     space.image = img
 
     with bpy.context.temp_override(area=area, space_data=space):
-        bpy.ops.dlss5nr.process_image()
+        bpy.ops.dlss5nr.process_image(encoding=str(encoding),
+                                      clamp=clamp)
     result = bpy.data.images.get("DLSS5_NR_Result")
     if result is not None:
         print("[gui_test] result image:", result.name,
-              result.size[0], "x", result.size[1], "float:", result.is_float)
+              result.size[0], "x", result.size[1], "float:", result.is_float,
+              "colorspace:", result.colorspace_settings.name)
     return result
 
 
