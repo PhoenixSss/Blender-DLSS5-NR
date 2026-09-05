@@ -16,7 +16,8 @@
 param(
     [switch]$Clean,
     [switch]$SkipTests,
-    [switch]$Verbose
+    [switch]$Verbose,
+    [switch]$Package
 )
 
 $ErrorActionPreference = "Stop"
@@ -230,6 +231,41 @@ Get-ChildItem -Path $ProjectRoot -Recurse -Include *.obj, *.exp, *.lib -File |
 
 if ($Clean) {
     Remove-Item -Recurse -Force $ObjDir -ErrorAction SilentlyContinue
+}
+
+# ---- 6. Add-on package (A7, §29) -------------------------------------------
+
+if ($Package) {
+    $Stage = Join-Path $OutDir "addon_package"
+    $AddonRoot = Join-Path $Stage "blender_dlss5_addon"
+    if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
+    # Blender requires __init__.py inside a top-level directory in the ZIP.
+    New-Item -ItemType Directory -Force -Path (Join-Path $AddonRoot "native") | Out-Null
+
+    foreach ($f in @("__init__.py", "operators.py", "panel.py",
+                     "bridge.py", "render_result.py", "image_output.py")) {
+        Copy-Item (Join-Path $ProjectRoot "blender\$f") $AddonRoot
+    }
+    Copy-Item (Join-Path $OutDir "nr_bridge.dll") `
+              (Join-Path $AddonRoot "native\nr_bridge.dll")
+    Copy-Item (Join-Path $OutDir "nvngx.dll_dlss5.dll") `
+              (Join-Path $AddonRoot "native\nvngx.dll_dlss5.dll")
+
+    # §30 guard: the package must NEVER contain NVIDIA runtime binaries.
+    $bad = Get-ChildItem -Recurse $Stage | Where-Object {
+        $_.Name -match "^nvngx_dlssnr|^_nvngx|^nvofapi|\.addon64$"
+    }
+    if ($bad) {
+        Write-Error "Forbidden NVIDIA file in package: $($bad.Name)"
+    }
+
+    $Zip = Join-Path $OutDir "blender_dlss5_addon.zip"
+    if (Test-Path $Zip) { Remove-Item $Zip }
+    Compress-Archive -Path $AddonRoot -DestinationPath $Zip
+    Write-Host "Package: $Zip"
+    Get-ChildItem -Recurse $AddonRoot | ForEach-Object {
+        Write-Host ("  " + $_.FullName.Substring($AddonRoot.Length + 1))
+    }
 }
 
 Write-Host "Build complete. Outputs in $OutDir"

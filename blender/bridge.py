@@ -13,20 +13,25 @@ import os
 # ---------------------------------------------------------------------------
 
 def find_bridge_dll():
-    """Locates nr_bridge.dll: DLSS5NR_NATIVE_DIR env override first, then
-    the project bin/ directory relative to this file."""
+    """Locates nr_bridge.dll:
+    1. <addon dir>/native/nr_bridge.dll (installed add-on package, A7)
+    2. DLSS5NR_NATIVE_DIR environment override
+    3. ../bin/nr_bridge.dll (development checkout fallback)"""
     candidates = []
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.join(here, "native", "nr_bridge.dll"))
     env = os.environ.get("DLSS5NR_NATIVE_DIR")
     if env:
         candidates.append(os.path.join(env, "nr_bridge.dll"))
-    here = os.path.dirname(os.path.abspath(__file__))
-    candidates.append(os.path.normpath(os.path.join(here, "..", "bin", "nr_bridge.dll")))
+    candidates.append(os.path.normpath(
+        os.path.join(here, "..", "bin", "nr_bridge.dll")))
     for path in candidates:
         if os.path.isfile(path):
             return path
     raise FileNotFoundError(
         "nr_bridge.dll not found. Tried: " + "; ".join(candidates) +
-        " (set DLSS5NR_NATIVE_DIR to the directory containing it)")
+        " (the add-on package ships it under native/; for development set "
+        "DLSS5NR_NATIVE_DIR to the bin directory)")
 
 
 _lib = ctypes.CDLL(find_bridge_dll())

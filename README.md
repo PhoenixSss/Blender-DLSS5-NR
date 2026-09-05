@@ -79,17 +79,22 @@ The build script never downloads or copies NVIDIA DLLs.
 Writes the processed image, a raw float32 buffer and a JSON report with
 GPU/driver/runtime identity, results and hashes. See `A1.md`.
 
-### Blender (A2 stage)
+### Blender add-on (A7)
 
-1. In Blender's Python console (or Scripting workspace), run
-   `blender/addon/__init__.py`, then execute an operator:
-   `bpy.ops.dlss5nr.process_image()` (image datablock input) or
-   `bpy.ops.dlss5nr.process_render_result()` (rendered Combined via the
-   compositor Viewer Node — Blender 5.x no longer exposes the Render
-   Result image to Python).
-2. The result appears as the `DLSS5_NR_Result` float image datablock.
+1. Build and package:
+   `powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1 -Package`
+   → `bin/blender_dlss5_addon.zip` (add-on code + native bridge/shim;
+   never contains NVIDIA runtime files).
+2. Blender 5.2+ → Preferences → Add-ons → Install from Disk → choose the
+   ZIP → enable "Blender DLSS 5 Neural Rendering".
+3. In the add-on preferences set the Runtime Directory (folder containing
+   the user-provided `nvngx_dlssnr.dll`).
+4. Render a frame, show the Compositing workspace once, then use the
+   Image Editor sidebar (N) → "DLSS 5 NR" panel → Process Render Result.
+   The result appears as the `DLSS5_NR_Result` float image datablock,
+   with a diagnostics sub-panel (§16).
 
-Details and acceptance records: `A2.md`.
+Details and acceptance records: `A2.md`, `A3.md`, `A7.md`.
 
 ## Runtime policy
 
