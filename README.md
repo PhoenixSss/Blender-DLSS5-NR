@@ -120,8 +120,8 @@ NVIDIA software/runtime you use. See
 - **A2** (Blender bridge integration): done and verified (headless +
   GUI). See `A2.md`.
 - **A3** (SceneLinear / Standard / AgX color-domain experiment):
-  implemented and automatically verified; default encoding pending
-  visual acceptance. See `A3.md`.
+  accepted — product default input encoding is **AgX** (scene-driven
+  selection, no overexposure on strong highlights). See `A3.md`.
 - Roadmap: A4 alpha correctness, A5 diagnostics UI, A6 policy
   validation, A7 UI / packaging; migration to the official NVIDIA
   Streamline API when it becomes public.

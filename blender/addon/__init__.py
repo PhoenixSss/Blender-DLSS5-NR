@@ -47,16 +47,21 @@ DEFAULT_RUNTIME_DIR = os.environ.get(
     r"D:\workspace\program\DLSS5-Blender\DLSS.5.Visual.Enhancer.v5.0\bin\runtime\host")
 
 
-# A3: scene-driven encoding selection (user decision 2026-09-05).
-# The neural input domain follows the scene's view transform, which also
-# defines the HDR strategy: display transforms (Standard/AgX) compress
-# scene-linear HDR values into [0,1] by design — no hard clamp is needed
-# to "handle" HDR, and out-of-range values never reach the network.
-#   AgX            -> AgXDisplay (2)
-#   Standard       -> StandardDisplay (1)
-#   Filmic/Filmic Log -> StandardDisplay (1)  [closest implemented family]
+# A3: scene-driven encoding selection. The neural input domain follows the
+# scene's view transform, which also defines the HDR strategy: display
+# transforms compress scene-linear HDR values into [0,1] by design — no
+# hard clamp is needed to "handle" HDR, and out-of-range values never
+# reach the network.
+#
+# A3 acceptance (2026-09-05, user visual test): the product default input
+# encoding is AgX — no overexposure on strong highlights (saturation is
+# slightly lower than the other paths, accepted trade-off).
+#   AgX             -> AgXDisplay (2)
+#   Standard        -> StandardDisplay (1)
+#   Filmic/Filmic Log -> AgXDisplay (2)  [product default; Filmic support
+#                      is deferred, mapped to the accepted default]
 #   Raw/False Color -> SceneLinear (0) + clamp (values passthrough)
-#   anything else  -> StandardDisplay (1)
+#   anything else   -> AgXDisplay (2)  (product default)
 def resolve_encoding(scene, choice="auto"):
     """Resolves the operator encoding choice. `choice` is the operator
     property value: 'auto' or '0'/'1'/'2'."""
@@ -69,12 +74,11 @@ def resolve_encoding(scene, choice="auto"):
         return 1
     if vt in ("Filmic", "Filmic Log"):
         print("[DLSS5-NR] scene view transform is Filmic — mapped to the "
-              "closest implemented family (Standard); Filmic itself is not "
-              "implemented yet")
-        return 1
+              "accepted product default (AgX); Filmic itself is deferred")
+        return 2
     if vt in ("Raw", "False Color"):
         return 0
-    return 1
+    return 2
 
 
 def _runtime_dir():
