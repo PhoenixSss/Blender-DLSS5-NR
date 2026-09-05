@@ -109,9 +109,9 @@ def _run_processing(input_image, scene, encoding="auto", clamp=True):
               f"CreateFeature={diag2['create_feature_result']} "
               f"EvaluateFeature={diag2['last_evaluate_result']}")
 
-    # Scene-linear HDR output is labeled "Linear"; display-referred
-    # encodings are sRGB-encoded values.
-    colorspace = "Linear" if encoding == 0 else "sRGB"
+    # Scene-linear HDR output is labeled with Blender's canonical linear
+    # colorspace name; display-referred encodings are sRGB-encoded values.
+    colorspace = "Linear Rec.709" if encoding == 0 else "sRGB"
     return image_output.write_result_image("DLSS5_NR_Result", w, h, out,
                                            colorspace=colorspace)
 

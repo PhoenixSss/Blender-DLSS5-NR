@@ -10,7 +10,9 @@ def write_result_image(name, width, height, rgba_top_left, colorspace="sRGB"):
     given top-left RGBA float32 data. Returns the Image.
 
     `colorspace` labels the buffer semantics (A3): display-referred
-    encodings use "sRGB", scene-linear HDR output uses "Linear".
+    encodings use "sRGB", scene-linear HDR output uses "Linear Rec.709"
+    (Blender 5.2's canonical scene-linear colorspace name; "Linear"
+    alone is not valid).
 
     No temporary files are involved (§29); the data goes straight into the
     datablock buffer."""
@@ -27,11 +29,14 @@ def write_result_image(name, width, height, rgba_top_left, colorspace="sRGB"):
     image = bpy.data.images.new(name, width=width, height=height,
                                 float_buffer=True)
     # The buffer holds the numeric values as-is; the label only declares
-    # their semantics (no color transform is applied here).
+    # their semantics (no color transform is applied here). Invalid or
+    # unavailable colorspace names must not crash the write — fall back
+    # to the image default with a warning.
     try:
         image.colorspace_settings.name = colorspace
-    except TypeError:
-        pass  # colorspace unavailable in this Blender version
+    except Exception:
+        print(f"[DLSS5-NR] WARNING: colorspace {colorspace!r} unavailable; "
+              f"using {image.colorspace_settings.name!r}")
 
     # Blender buffers are bottom-up: flip the canonical top-left rows.
     numpy, _ = _numpy_or_array_module()
