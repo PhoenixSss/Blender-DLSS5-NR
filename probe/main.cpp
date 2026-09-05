@@ -43,7 +43,8 @@ struct Options {
     backends::NeuralSettings settings;
     canonical::ColorEncoding encoding = canonical::ColorEncoding::SceneLinear;
     bool hdr_pattern = false;  // A3: synthetic pattern with >1 highlights
-    bool clamp = false;        // A3: restore the A1/A2 [0,1] clamp behavior
+    bool clamp = true;         // default ON: [0,1] is the network's
+                               // known-good domain (A3 artifact finding)
     bool reject_unsigned = false;
     bool show_help = false;
     bool show_version = false;
@@ -127,6 +128,7 @@ bool ParseArgs(int argc, char** argv, Options* o, std::string* usage_error) {
         }
         else if (a == "--hdr-pattern") { o->hdr_pattern = true; }
         else if (a == "--clamp") { o->clamp = true; }
+        else if (a == "--no-clamp") { o->clamp = false; }
         else if (a == "--reject-unsigned") { o->reject_unsigned = true; }
         else {
             if (usage_error) *usage_error = "Unknown option: " + a;

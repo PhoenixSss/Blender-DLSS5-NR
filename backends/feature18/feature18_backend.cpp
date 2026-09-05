@@ -110,9 +110,12 @@ struct Feature18Backend::Impl {
     std::wstring runtime_dir;
     std::wstring ngx_core_path;
     bool reject_unsigned = false;
-    // A3: clamp upload/readback RGB to [0,1]. Default OFF — scene-linear
-    // HDR values (>1) pass through; --clamp restores the A1/A2 behavior.
-    bool clamp_input = false;
+    // Clamp upload/readback RGB to [0,1]. Default ON — the A3 experiment
+    // proved that feeding raw scene-linear HDR values (up to ~300x in real
+    // renders) to the network causes local block artifacts; the runtime's
+    // known-good domain is [0,1]. --no-clamp restores the HDR passthrough
+    // for experiments only.
+    bool clamp_input = true;
 
     // Identity / diagnostics.
     GpuInfo gpu;

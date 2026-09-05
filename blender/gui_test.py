@@ -15,9 +15,10 @@ TEST_IMAGE_DIR = os.environ.get(
     r"D:\workspace\program\DLSS5-Blender\Blender-DLSS5-NR")
 
 
-def run_nr(imgname, encoding=0, clamp=False):
+def run_nr(imgname, encoding=0, clamp=True):
     """Loads the image, shows it in an Image Editor and runs the operator.
-    encoding: 0=scene-linear, 1=standard, 2=agx (A3 experiment)."""
+    encoding: 0=scene-linear, 1=standard, 2=agx (A3 experiment).
+    clamp defaults ON: [0,1] is the network's known-good domain."""
     img = bpy.data.images.get(imgname)
     if img is None:
         img = bpy.data.images.load(os.path.join(TEST_IMAGE_DIR, imgname))

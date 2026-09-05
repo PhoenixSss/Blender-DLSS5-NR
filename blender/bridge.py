@@ -178,7 +178,7 @@ class Bridge:
     """One bridge DLL session: create -> initialize -> evaluate* -> destroy."""
 
     def __init__(self, runtime_dir=None, ngx_core_path=None, gpu_index=0,
-                 reject_unsigned=False, clamp_input=False):
+                 reject_unsigned=False, clamp_input=True):
         opts = NR_Options()
         opts.runtime_dir = runtime_dir.encode("utf-8") if runtime_dir else None
         opts.ngx_core_path = ngx_core_path.encode("utf-8") if ngx_core_path else None

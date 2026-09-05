@@ -104,8 +104,9 @@ class DLSS5NR_OT_ProcessImage(bpy.types.Operator):
     )
     clamp: bpy.props.BoolProperty(
         name="Clamp [0,1]",
-        description="Clamp RGB to [0,1] (A1/A2 behavior; off = HDR passthrough)",
-        default=False,
+        description="Clamp RGB to [0,1] (default ON: the network's known-good "
+                    "domain; HDR passthrough caused artifacts in A3 testing)",
+        default=True,
     )
 
     @classmethod
@@ -165,7 +166,7 @@ class DLSS5NR_OT_ProcessRenderResult(bpy.types.Operator):
     )
     clamp: bpy.props.BoolProperty(
         name="Clamp [0,1]",
-        default=False,
+        default=True,
     )
 
 
