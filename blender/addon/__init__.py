@@ -47,17 +47,49 @@ DEFAULT_RUNTIME_DIR = os.environ.get(
     r"D:\workspace\program\DLSS5-Blender\DLSS.5.Visual.Enhancer.v5.0\bin\runtime\host")
 
 
+# A3: scene-driven encoding selection (user decision 2026-09-05).
+# The neural input domain follows the scene's view transform, which also
+# defines the HDR strategy: display transforms (Standard/AgX) compress
+# scene-linear HDR values into [0,1] by design — no hard clamp is needed
+# to "handle" HDR, and out-of-range values never reach the network.
+#   AgX            -> AgXDisplay (2)
+#   Standard       -> StandardDisplay (1)
+#   Filmic/Filmic Log -> StandardDisplay (1)  [closest implemented family]
+#   Raw/False Color -> SceneLinear (0) + clamp (values passthrough)
+#   anything else  -> StandardDisplay (1)
+def resolve_encoding(scene, choice="auto"):
+    """Resolves the operator encoding choice. `choice` is the operator
+    property value: 'auto' or '0'/'1'/'2'."""
+    if choice != "auto":
+        return int(choice)
+    vt = getattr(getattr(scene, "view_settings", None), "view_transform", "")
+    if vt == "AgX":
+        return 2
+    if vt == "Standard":
+        return 1
+    if vt in ("Filmic", "Filmic Log"):
+        print("[DLSS5-NR] scene view transform is Filmic — mapped to the "
+              "closest implemented family (Standard); Filmic itself is not "
+              "implemented yet")
+        return 1
+    if vt in ("Raw", "False Color"):
+        return 0
+    return 1
+
+
 def _runtime_dir():
     return os.environ.get("DLSS5NR_RUNTIME_DIR", DEFAULT_RUNTIME_DIR)
 
 
-def _run_processing(input_image, encoding=0, clamp=False):
+def _run_processing(input_image, scene, encoding="auto", clamp=True):
     runtime_dir = _runtime_dir()
     if not runtime_dir:
         raise RuntimeError(
             "Runtime directory not set. Set the environment variable "
             "DLSS5NR_RUNTIME_DIR to the directory containing nvngx_dlssnr.dll "
             "(A7 adds a UI preference for this).")
+
+    encoding = resolve_encoding(scene, encoding)
 
     w, h = input_image.size
     rgba = render_result.image_pixels_top_left(input_image)
@@ -94,13 +126,16 @@ class DLSS5NR_OT_ProcessImage(bpy.types.Operator):
 
     encoding: bpy.props.EnumProperty(
         name="Color Encoding",
-        description="Color domain fed to the neural backend (A3 experiment)",
+        description="Color domain fed to the neural backend. 'Auto' follows "
+                    "the scene's view transform (A3 decision: scene-driven)",
         items=[
-            ("0", "Scene Linear", "Raw scene-linear HDR passthrough"),
+            ("auto", "Auto (scene view transform)", "Follow the scene's "
+             "view transform; display transforms compress HDR to [0,1]"),
+            ("0", "Scene Linear", "Raw scene-linear (clamped [0,1])"),
             ("1", "Standard", "sRGB EOTF display encoding"),
             ("2", "AgX", "AgX display transform"),
         ],
-        default="0",
+        default="auto",
     )
     clamp: bpy.props.BoolProperty(
         name="Clamp [0,1]",
@@ -116,8 +151,8 @@ class DLSS5NR_OT_ProcessImage(bpy.types.Operator):
 
     def execute(self, context):
         try:
-            result = _run_processing(context.space_data.image,
-                                     encoding=int(self.encoding),
+            result = _run_processing(context.space_data.image, context.scene,
+                                     encoding=self.encoding,
                                      clamp=self.clamp)
         except Exception as e:  # noqa: BLE001 — surface everything to user
             self.report({"ERROR"}, str(e))
@@ -143,8 +178,8 @@ class DLSS5NR_OT_ProcessRenderResult(bpy.types.Operator):
                 raise RuntimeError(
                     "No compositing node group on this scene "
                     "(Blender 5.x: Scene.compositing_node_group)")
-            result = _run_processing(viewer,
-                                     encoding=int(self.encoding),
+            result = _run_processing(viewer, context.scene,
+                                     encoding=self.encoding,
                                      clamp=self.clamp)
         except Exception as e:  # noqa: BLE001
             self.report({"ERROR"}, str(e))
@@ -158,11 +193,13 @@ class DLSS5NR_OT_ProcessRenderResult(bpy.types.Operator):
     encoding: bpy.props.EnumProperty(
         name="Color Encoding",
         items=[
-            ("0", "Scene Linear", "Raw scene-linear HDR passthrough"),
+            ("auto", "Auto (scene view transform)", "Follow the scene's "
+             "view transform"),
+            ("0", "Scene Linear", "Raw scene-linear (clamped [0,1])"),
             ("1", "Standard", "sRGB EOTF display encoding"),
             ("2", "AgX", "AgX display transform"),
         ],
-        default="0",
+        default="auto",
     )
     clamp: bpy.props.BoolProperty(
         name="Clamp [0,1]",
