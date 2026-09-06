@@ -20,25 +20,26 @@ def write_result_image(name, width, height, rgba_top_left, colorspace="sRGB"):
     if rgba_top_left.size != width * height * 4:
         raise ValueError("rgba_top_left size does not match width/height")
 
-    # Update in place whenever possible: other objects (e.g. the façade
-    # group's Image node) may hold references to the datablock — removing
-    # it mid-render leaves dangling pointers and crashes the compositor.
+    # In-place update only when type AND size already match (no scale():
+    # resizing a compositor-referenced datablock does not synchronously
+    # reallocate its pixel array in GUI sessions -> slice-assignment
+    # TypeError). Size changes recreate the datablock and re-point the
+    # façade's Image nodes (safe here: operators run outside the render
+    # pipeline; mid-render deletion is forbidden, see requirements §12).
     image = bpy.data.images.get(name)
-    if image is not None and not image.is_float:
-        # A user-loaded non-float image with this name is not ours; only
-        # then replace it (the façade always uses the float datablock).
-        image.user_clear()
-        bpy.data.images.remove(image)
-        image = None
-    if image is None:
+    reusable = (image is not None and image.is_float and
+                list(image.size) == [width, height])
+    if not reusable:
+        if image is not None:
+            image.user_clear()
+            bpy.data.images.remove(image)
         image = bpy.data.images.new(name, width=width, height=height,
                                     float_buffer=True)
-    else:
-        if list(image.size) != [width, height]:
-            image.scale(width, height)
-        if not image.is_float:
-            image = bpy.data.images.new(name, width=width, height=height,
-                                        float_buffer=True)
+        try:
+            from . import facade
+            facade.repin_result_image(image)
+        except Exception:
+            pass  # façade not loaded (probe/dev contexts)
 
     # The buffer holds the numeric values as-is; the label only declares
     # their semantics (no color transform is applied here). Invalid or

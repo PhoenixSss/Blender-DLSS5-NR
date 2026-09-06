@@ -24,6 +24,17 @@ def ensure_result_image():
     return img
 
 
+def repin_result_image(new_image):
+    """Re-points every façade Image node at `new_image` (called after the
+    result datablock is recreated on a size change)."""
+    for group in bpy.data.node_groups:
+        if group.name != FACADE_GROUP_NAME:
+            continue
+        for node in group.nodes:
+            if node.type == "IMAGE":
+                node.image = new_image
+
+
 def ensure_facade_group():
     """Creates (or returns) the façade node group."""
     group = bpy.data.node_groups.get(FACADE_GROUP_NAME)
