@@ -40,14 +40,18 @@ def image_pixels_top_left(image):
 
 def ensure_viewer_path(scene):
     """Ensures an RLayers -> Viewer branch exists in the scene's compositor
-    node group (Blender 5.x: Scene.compositing_node_group). GUI-only path:
-    the viewer image updates after the compositing workspace is shown.
+    node group (Blender 5.x: Scene.compositing_node_group). Creates the
+    standard passthrough tree when the scene has no compositing at all.
 
-    Returns the Viewer Node image or None when the path cannot be prepared
-    (e.g. headless mode without a compositor group)."""
-    group = getattr(scene, "compositing_node_group", None)
-    if group is None:
-        return None
+    Returns the Viewer Node image; GUI path: the viewer updates after the
+    compositing workspace is shown."""
+    try:
+        from . import facade
+        group = facade.ensure_scene_compositor_tree(scene)
+    except Exception:
+        group = getattr(scene, "compositing_node_group", None)
+        if group is None:
+            return None
     rl = next((n for n in group.nodes if n.type == "R_LAYERS"), None)
     if rl is None:
         rl = group.nodes.new("CompositorNodeRLayers")

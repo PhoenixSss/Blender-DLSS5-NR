@@ -65,25 +65,31 @@ def ensure_facade_group():
     return group
 
 
-def add_facade_to_scene(scene):
-    """Inserts a façade group instance into the scene's compositor tree
-    (creating the tree when absent). Returns the group instance node."""
-    ensure_facade_group()
+def ensure_scene_compositor_tree(scene):
+    """Returns the scene's compositor tree, creating a standard
+    Render Layers -> output passthrough when absent (Blender 5.x: the
+    tree's group output IS the composite output — CompositorNodeComposite
+    no longer exists). Non-destructive: a passthrough tree renders
+    exactly like no compositing."""
     tree = getattr(scene, "compositing_node_group", None)
     if tree is None:
         tree = bpy.data.node_groups.new("DLSS5NR_Compositor",
                                         "CompositorNodeTree")
         scene.compositing_node_group = tree
-        # A scene without compositing has no tree; build the standard
-        # Render Layers -> output path (Blender 5.x: the tree's group
-        # output IS the composite output — CompositorNodeComposite no
-        # longer exists) so enabling the group never breaks frame output.
         rl = tree.nodes.new("CompositorNodeRLayers")
         rl.name = "Render Layers"
         gout = tree.nodes.new("NodeGroupOutput")
         tree.interface.new_socket("Image", in_out="OUTPUT",
                                   socket_type="NodeSocketColor")
         tree.links.new(rl.outputs["Image"], gout.inputs["Image"])
+    return tree
+
+
+def add_facade_to_scene(scene):
+    """Inserts a façade group instance into the scene's compositor tree
+    (creating the tree when absent). Returns the group instance node."""
+    ensure_facade_group()
+    tree = ensure_scene_compositor_tree(scene)
     node = tree.nodes.new("CompositorNodeGroup")
     node.name = FACADE_NODE_NAME
     node.node_tree = bpy.data.node_groups[FACADE_GROUP_NAME]
