@@ -50,7 +50,45 @@ def resolve_encoding(scene, choice="auto"):
     return 2
 
 
-def _run_processing(input_image, scene, settings, prefs):
+def resolve_input_encoding(input_image, scene, choice="auto"):
+    """Resolve the backend color domain for the selected Blender image.
+
+    Blender exposes file-backed image pixels after applying the image
+    datablock's input colorspace conversion.  In particular, an sRGB PNG
+    loaded as ``sRGB`` is already represented by linear float values in
+    ``image.pixels``.  Applying the scene's AgX/Standard transform to that
+    buffer again double-maps the image and produces the washed-out result
+    reported in the GUI.
+
+    Render/Viewer images are scene-linear and continue to follow the scene
+    view transform in Auto mode.  An explicit 0/1/2 choice always wins so
+    advanced users can deliberately override the automatic interpretation.
+    """
+    if choice != "auto":
+        return int(choice)
+
+    source = getattr(input_image, "source", "")
+    if source == "VIEWER":
+        return resolve_encoding(scene, choice)
+
+    # FILE images have already passed through Blender's configured image
+    # colorspace into the float pixel buffer.  Feed that linear buffer to the
+    # network without another display transform.  This covers PNG/JPEG sRGB,
+    # linear EXR, and Non-Color/data images consistently.
+    if source == "FILE":
+        colorspace = getattr(
+            getattr(input_image, "colorspace_settings", None), "name", "")
+        print("[DLSS5-NR] file image Auto mode: Blender colorspace "
+              f"{colorspace or '(default)'} already decoded the pixel "
+              "buffer; using SceneLinear (0)")
+        return 0
+
+    # Generated images are ambiguous unless they carry the add-on's own
+    # metadata.  Preserve the historical scene-driven behavior for them.
+    return resolve_encoding(scene, choice)
+
+
+def _resolve_runtime_dir(prefs):
     runtime_dir = (prefs.runtime_dir if prefs else "").strip()
     if not runtime_dir:
         runtime_dir = os.environ.get("DLSS5NR_RUNTIME_DIR", "")
@@ -59,11 +97,14 @@ def _run_processing(input_image, scene, settings, prefs):
             "Runtime directory not set. Open Preferences > Blender DLSS 5 "
             "Neural Rendering and choose the directory containing the "
             "user-provided nvngx_dlssnr.dll.")
+    return runtime_dir
 
-    encoding = resolve_encoding(scene, settings.encoding)
 
-    w, h = input_image.size
-    rgba = render_result.image_pixels_top_left(input_image)
+def process_rgba(w, h, rgba, scene, settings, prefs, encoding):
+    """Shared processing core: canonical top-left float32 in -> output in
+    the same domain. Used by the single-frame operators and the batch
+    pipeline. Updates `_last_diagnostics`. Returns (out, encoding)."""
+    runtime_dir = _resolve_runtime_dir(prefs)
 
     kwargs = dict(
         runtime_dir=runtime_dir,
@@ -102,6 +143,16 @@ def _run_processing(input_image, scene, settings, prefs):
         _last_diagnostics.update(diag2)
         _last_diagnostics["encoding"] = encoding
         _last_diagnostics["clamp"] = settings.clamp
+    return out, encoding
+
+
+def _run_processing(input_image, scene, settings, prefs):
+    encoding = resolve_input_encoding(input_image, scene, settings.encoding)
+
+    w, h = input_image.size
+    rgba = render_result.image_pixels_top_left(input_image)
+
+    out, encoding = process_rgba(w, h, rgba, scene, settings, prefs, encoding)
 
     # Scene-linear HDR output is labeled with Blender's canonical linear
     # colorspace name; display-referred encodings are sRGB-encoded values.

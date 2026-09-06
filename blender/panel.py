@@ -7,6 +7,7 @@ import os
 import bpy
 
 from . import ADDON_ID
+from . import facade
 from . import operators
 
 
@@ -58,6 +59,21 @@ class DLSS5NR_PT_Main(bpy.types.Panel):
                   if prefs and prefs.runtime_dir else "(not set)")
         box.operator("preferences.addon_show", text="Open Preferences",
                      icon="PREFERENCES").module = ADDON_ID
+
+        # Compositor node façade (需求书 阶段 1: node + preview only —
+        # no automatic behavior; batch processing is a later phase).
+        box = layout.box()
+        box.label(text="Compositor Node")
+        present = facade.facade_enabled(context.scene)
+        row = box.row()
+        row.label(text="State",
+                  icon="CHECKBOX_HLT" if present else "CHECKBOX_DEHLT")
+        row.label(text="in compositor" if present else "not added")
+        box.operator("dlss5nr.add_facade", icon="NODETREE")
+        if not present:
+            box.label(text="Add the node, connect its output to a Viewer, "
+                           "then process a frame to preview the result.")
+        box.operator("dlss5nr.refresh_probe", icon="RESTRICT_RENDER_OFF")
 
 
 class DLSS5NR_PT_Diagnostics(bpy.types.Panel):

@@ -94,6 +94,12 @@ GPU/driver/runtime identity, results and hashes. See `A1.md`.
    The result appears as the `DLSS5_NR_Result` float image datablock,
    with a diagnostics sub-panel (§16).
 
+In Auto color-input mode, Render Result / Viewer follows the scene view
+transform. A file-backed image (PNG/EXR, etc.) uses Blender's already
+colorspace-decoded float buffer, so it is not display-mapped a second time.
+Explicit Scene Linear / Standard / AgX choices remain available for testing
+or deliberate overrides.
+
 Details and acceptance records: `A2.md`, `A3.md`, `A7.md`.
 
 ## Runtime policy

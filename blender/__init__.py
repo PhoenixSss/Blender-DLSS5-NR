@@ -25,6 +25,7 @@ bl_info = {
 # file is named blender_dlss5_addon.zip).
 ADDON_ID = "blender_dlss5_addon"
 
+from . import facade  # noqa: E402
 from . import operators  # noqa: E402
 from . import panel  # noqa: E402
 
@@ -70,7 +71,8 @@ class DLSS5NR_Settings(bpy.types.PropertyGroup):
     encoding: bpy.props.EnumProperty(
         name="Color Input Mode",
         description="Color domain fed to the neural backend. 'Auto' follows "
-                    "the scene's view transform (product default: AgX)",
+                    "the scene for Render Result and respects Blender's "
+                    "image colorspace for file images (product default: AgX)",
         items=[
             ("auto", "Auto (scene view transform)", "Follow the scene's "
              "view transform; display transforms compress HDR to [0,1]"),
@@ -132,6 +134,8 @@ CLASSES = (
     operators.DLSS5NR_OT_ProcessImage,
     operators.DLSS5NR_OT_ProcessRenderResult,
     operators.DLSS5NR_OT_CopyRuntimeHash,
+    facade.DLSS5NR_OT_AddFacade,
+    facade.DLSS5NR_OT_RefreshProbe,
     panel.DLSS5NR_PT_Main,
     panel.DLSS5NR_PT_Diagnostics,
 )

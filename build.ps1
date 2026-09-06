@@ -242,8 +242,9 @@ if ($Package) {
     # Blender requires __init__.py inside a top-level directory in the ZIP.
     New-Item -ItemType Directory -Force -Path (Join-Path $AddonRoot "native") | Out-Null
 
-    foreach ($f in @("__init__.py", "operators.py", "panel.py",
-                     "bridge.py", "render_result.py", "image_output.py")) {
+    foreach ($f in @("__init__.py", "operators.py", "panel.py", "facade.py",
+                     "bridge.py", "render_result.py",
+                     "image_output.py")) {
         Copy-Item (Join-Path $ProjectRoot "blender\$f") $AddonRoot
     }
     Copy-Item (Join-Path $OutDir "nr_bridge.dll") `
